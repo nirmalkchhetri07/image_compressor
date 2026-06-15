@@ -129,7 +129,7 @@ export function DropZone({ compact = false }: DropZoneProps) {
           ))}
         </div>
 
-        <p className="text-xs text-muted-foreground mt-4">Max file size: 50 MB</p>
+        <p className="text-lg text-muted-foreground mt-4">Max file size: 50 MB</p>
       </div>
     </div>
   )

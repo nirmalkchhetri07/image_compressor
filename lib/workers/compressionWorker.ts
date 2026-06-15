@@ -38,9 +38,12 @@ export function useCompressionWorker() {
       workerRef.current.postMessage({
         type: 'compress',
         id,
-        imageDataUrl,
-        settings,
-      })
+        payload: {
+          id,
+          imageDataUrl,
+          settings,
+        },
+      } as WorkerMessage)
     }
   }
 

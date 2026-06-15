@@ -9,8 +9,9 @@ import { FileList } from '@/components/upload/FileList'
 import { StatsDashboard } from '@/components/statistics/StatsDashboard'
 import { BeforeAfter } from '@/components/preview/BeforeAfter'
 import { DownloadPanel } from '@/components/download/DownloadPanel'
-import { Code, Moon, Sun, Zap, Smartphone, Lock, Loader2, X, Undo2 } from 'lucide-react'
+import { Zap, Smartphone, Lock, Loader2, X, Undo2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import Image from 'next/image'
 
 export default function Home() {
   const files = useImageStore((state) => state.files)
@@ -22,7 +23,6 @@ export default function Home() {
   const downloadAll = useImageStore((state) => state.downloadAll)
 
   const { isCompressing } = useCompression()
-  const [isDark, setIsDark] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null)
 
@@ -42,17 +42,10 @@ export default function Home() {
     }, 3500)
   }
 
-  // Load theme and settings on mount
+  // Load settings on mount
   useEffect(() => {
     setMounted(true)
     loadSettings()
-
-    const isDarkMode = localStorage.getItem('theme') === 'dark' || 
-      (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)
-    setIsDark(isDarkMode)
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark')
-    }
   }, [loadSettings])
 
   // Keyboard Shortcuts Listener (Ctrl+Z and Ctrl+S)
@@ -95,17 +88,6 @@ export default function Home() {
     }
   }, [files, selectedFileId])
 
-  const toggleTheme = () => {
-    const newIsDark = !isDark
-    setIsDark(newIsDark)
-    if (newIsDark) {
-      document.documentElement.classList.add('dark')
-      localStorage.setItem('theme', 'dark')
-    } else {
-      document.documentElement.classList.remove('dark')
-      localStorage.setItem('theme', 'light')
-    }
-  }
 
   const pendingFiles = files.filter((f) => f.status === 'idle')
   const selectedFile = files.find((f) => f.id === selectedFileId)
@@ -116,17 +98,11 @@ export default function Home() {
       <header className="sticky top-0 z-40 border-b border-slate-800 bg-slate-900/80 dark:bg-slate-950/80 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30">
-              <Zap className="w-6 h-6 text-white" />
+            <div className='mt-0.9'>
+                <Image src="/logo.svg" alt="Logo Text" width={200} height={24} className="object-contain" />
+             
             </div>
-            <div>
-              <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
-                ImageOptimizer Pro
-              </h1>
-              <p className="text-[10px] text-slate-400 font-semibold tracking-wider uppercase">Local Browser Optimization</p>
-            </div>
-          </div>
-
+          </div> 
           <div className="flex items-center gap-2">
             <a
               href="https://github.com"
@@ -135,18 +111,14 @@ export default function Home() {
               className="p-2.5 hover:bg-slate-850 rounded-xl transition-all duration-250 text-slate-400 hover:text-blue-400"
               aria-label="GitHub Repository"
             >
-              <Code className="w-5 h-5" />
+              <svg viewBox="0 0 24 24" aria-hidden="true" className="w-5 h-5 fill-current">
+                <path d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.166 6.839 9.489.5.092.682-.217.682-.483 0-.237-.008-.866-.013-1.7-2.782.603-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.464-1.11-1.464-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.831.092-.646.35-1.086.636-1.336-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.564 9.564 0 0 1 12 6.844c.85.004 1.705.115 2.504.337 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.579.688.481C19.138 20.161 22 16.416 22 12c0-5.523-4.477-10-10-10z" />
+              </svg>
             </a>
-            <button
-              onClick={toggleTheme}
-              className="p-2.5 hover:bg-slate-850 rounded-xl transition-all duration-250 text-slate-400 hover:text-blue-400"
-              aria-label="Toggle light/dark theme"
-            >
-              {mounted && (isDark ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5" />)}
-            </button>
           </div>
         </div>
       </header>
+
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         {/* Full-width Hero / Welcome Upload section if empty queue */}
@@ -303,7 +275,7 @@ export default function Home() {
         <footer className="mt-20 py-12 border-t border-slate-800/50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-slate-500 text-xs">
             <p>
-              Built with Next.js, React, Zustand, and Tailwind CSS. Processing runs fully sandboxed within your local browser runtime.
+             Made with ❤️ and ☕ in NEPAL
             </p>
           </div>
         </footer>

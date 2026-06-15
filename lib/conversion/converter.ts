@@ -94,4 +94,4 @@ async function convertFormat(
 }
 
 export { convertFormat }
-export type { ConversionOptions }
+

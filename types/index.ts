@@ -1,5 +1,5 @@
 export type CompressionMode = 'quality' | 'exact' | 'resolution'
-export type OutputFormat = 'jpg' | 'png' | 'webp' | 'avif' | 'bmp' | 'tiff' | 'pdf'
+export type OutputFormat = 'jpg' | 'png' | 'webp' | 'avif' | 'bmp' | 'tiff'
 export type FileInputType = 'image' | 'pdf'
 export type ResizeMode = 'original' | 'percentage' | 'width' | 'height' | 'fitWidth' | 'fitHeight'
 export type SizeUnit = 'KB' | 'MB'
@@ -75,5 +75,11 @@ export interface ValidationResult {
 export interface WorkerMessage {
   type: 'compress' | 'progress' | 'result' | 'error'
   id: string
-  payload: unknown
+  payload?: unknown
+  blob?: Blob
+  dimensions?: ImageDimensions
+  processingTimeMs?: number
+  message?: string
+  imageDataUrl?: string
+  settings?: unknown
 }

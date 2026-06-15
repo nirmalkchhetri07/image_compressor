@@ -86,6 +86,8 @@ export const useImageStore = create<ImageStore>((set, get) => ({
   addFiles: async (files: File[]) => {
     const existingFiles = get().files.map((f) => f.originalFile)
     const currentGlobalSettings = get().globalSettings
+    
+    // 1. Validate files in parallel
     const validFiles = await Promise.all(
       files.map(async (file) => {
         const validation = await validateFile(file, existingFiles)
@@ -93,24 +95,34 @@ export const useImageStore = create<ImageStore>((set, get) => ({
       })
     )
 
-    const newFiles: ImageFile[] = []
+    const filesToProcess = validFiles.filter(({ validation }) => validation.valid).map(({ file }) => file)
+    if (filesToProcess.length === 0) return
 
-    for (const { file, validation } of validFiles) {
-      if (!validation.valid) {
-        continue
-      }
+    // 2. Process all valid files in parallel
+    const newFiles = await Promise.all(
+      filesToProcess.map((file) => {
+        return new Promise<ImageFile>((resolve) => {
+          const previewUrl = URL.createObjectURL(file)
+          const ext = file.name.toLowerCase().split('.').pop()
+          const isPdf = ext === 'pdf' || file.type === 'application/pdf'
 
-      const id = generateId()
-      const reader = new FileReader()
+          if (isPdf) {
+            resolve({
+              id: generateId(),
+              originalFile: file,
+              originalSize: file.size,
+              originalDimensions: { width: 0, height: 0 },
+              originalPreviewUrl: previewUrl,
+              status: 'idle',
+              settings: { ...currentGlobalSettings },
+            })
+            return
+          }
 
-      await new Promise((resolve) => {
-        reader.onload = async (e) => {
-          const dataUrl = e.target?.result as string
           const img = new Image()
           img.onload = () => {
-            const previewUrl = URL.createObjectURL(file)
-            newFiles.push({
-              id,
+            resolve({
+              id: generateId(),
               originalFile: file,
               originalSize: file.size,
               originalDimensions: { width: img.width, height: img.height },
@@ -118,14 +130,25 @@ export const useImageStore = create<ImageStore>((set, get) => ({
               status: 'idle',
               settings: { ...currentGlobalSettings },
             })
-            resolve(true)
           }
-          img.src = dataUrl
-        }
-        reader.readAsDataURL(file)
+          img.onerror = () => {
+            resolve({
+              id: generateId(),
+              originalFile: file,
+              originalSize: file.size,
+              originalDimensions: { width: 0, height: 0 },
+              originalPreviewUrl: previewUrl,
+              status: 'error',
+              error: 'Failed to load image preview',
+              settings: { ...currentGlobalSettings },
+            })
+          }
+          img.src = previewUrl
+        })
       })
-    }
+    )
 
+    // 3. Update state once
     set((state) => ({
       files: [...state.files, ...newFiles],
       batchProgress: {
@@ -217,7 +240,13 @@ export const useImageStore = create<ImageStore>((set, get) => ({
     set((state) => ({
       files: state.files.map((f) =>
         f.id === id
-          ? { ...f, settings: { ...f.settings, ...settings } }
+          ? {
+              ...f,
+              settings: {
+                ...(f.settings || state.globalSettings),
+                ...settings,
+              },
+            }
           : f
       ),
     }))
@@ -242,57 +271,71 @@ export const useImageStore = create<ImageStore>((set, get) => ({
         ? settings.targetSize * 1024 
         : settings.targetSize * 1024 * 1024
 
-      const reader = new FileReader()
+      const objectUrl = URL.createObjectURL(file.originalFile)
       await new Promise((resolve) => {
-        reader.onload = async (e) => {
-          const dataUrl = e.target?.result as string
-          const img = new Image()
-          img.onload = async () => {
-            try {
-              const result = await binarySearchCompress(img, targetBytes, settings)
-              const processingTime = performance.now() - startTime
-              const compressedPreviewUrl = URL.createObjectURL(result.blob)
+        const img = new Image()
+        img.onload = async () => {
+          try {
+            const result = await binarySearchCompress(img, targetBytes, settings)
+            const processingTime = performance.now() - startTime
+            const compressedPreviewUrl = URL.createObjectURL(result.blob)
 
-              set((state) => ({
-                files: state.files.map((f) =>
-                  f.id === id
-                    ? {
-                        ...f,
-                        status: 'done' as FileStatus,
-                        compressedBlob: result.blob,
-                        compressedSize: result.blob.size,
-                        compressedDimensions: result.dimensions,
-                        compressedPreviewUrl,
-                        processingTimeMs: processingTime,
-                        settings: settings,
-                      }
-                    : f
-                ),
-                batchProgress: {
-                  ...state.batchProgress,
-                  completed: state.batchProgress.completed + 1,
-                  processing: Math.max(0, state.batchProgress.processing - 1),
-                },
-              }))
-              resolve(true)
-            } catch (error) {
-              const errorMessage = error instanceof Error ? error.message : 'Compression failed'
-              set((state) => ({
-                files: state.files.map((f) =>
-                  f.id === id ? { ...f, status: 'error' as FileStatus, error: errorMessage } : f
-                ),
-                batchProgress: {
-                  ...state.batchProgress,
-                  failed: state.batchProgress.failed + 1,
-                  processing: Math.max(0, state.batchProgress.processing - 1),
-                },
-              }))
-              resolve(false)
-            }
+            set((state) => ({
+              files: state.files.map((f) =>
+                f.id === id
+                  ? {
+                      ...f,
+                      status: 'done' as FileStatus,
+                      compressedBlob: result.blob,
+                      compressedSize: result.blob.size,
+                      compressedDimensions: result.dimensions,
+                      compressedPreviewUrl,
+                      processingTimeMs: processingTime,
+                      settings: settings,
+                    }
+                  : f
+              ),
+              batchProgress: {
+                ...state.batchProgress,
+                completed: state.batchProgress.completed + 1,
+                processing: Math.max(0, state.batchProgress.processing - 1),
+              },
+            }))
+            resolve(true)
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Compression failed'
+            set((state) => ({
+              files: state.files.map((f) =>
+                f.id === id ? { ...f, status: 'error' as FileStatus, error: errorMessage } : f
+              ),
+              batchProgress: {
+                ...state.batchProgress,
+                failed: state.batchProgress.failed + 1,
+                processing: Math.max(0, state.batchProgress.processing - 1),
+              },
+            }))
+            resolve(false)
+          } finally {
+            URL.revokeObjectURL(objectUrl)
           }
-          img.src = dataUrl
         }
-        reader.readAsDataURL(file.originalFile)
+
+        img.onerror = () => {
+          set((state) => ({
+            files: state.files.map((f) =>
+              f.id === id ? { ...f, status: 'error' as FileStatus, error: 'Failed to load image for compression' } : f
+            ),
+            batchProgress: {
+              ...state.batchProgress,
+              failed: state.batchProgress.failed + 1,
+              processing: Math.max(0, state.batchProgress.processing - 1),
+            },
+          }))
+          URL.revokeObjectURL(objectUrl)
+          resolve(false)
+        }
+
+        img.src = objectUrl
       })
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Processing failed'
